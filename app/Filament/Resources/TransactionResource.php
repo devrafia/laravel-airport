@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\TransactionResource\Pages;
 use App\Filament\Resources\TransactionResource\RelationManagers;
+use App\Models\FlightClass;
 use App\Models\FlightSeat;
+use App\Models\PromoCode;
 use App\Models\Transaction;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
@@ -13,12 +15,17 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+
+use function Pest\Laravel\get;
 
 class TransactionResource extends Resource
 {
@@ -32,25 +39,81 @@ class TransactionResource extends Resource
             ->schema([
                 Section::make('Informasi Umum')
                     ->schema([
-
-                        TextInput::make('code'),
+                        TextInput::make('code')
+                            ->required(),
                         Select::make('flight_id')
-                            ->relationship('flight', 'flight_number'),
+                            ->relationship('flight', 'flight_number')
+                            ->afterStateUpdated(function (callable $set) {
+                                $set('flight_class_id', null);
+                            })
+                            ->live()
+                            ->required(),
                         Select::make('flight_class_id')
                             ->relationship('class', 'class_type')
+                            ->live()
+                            ->required()
+                            ->options(function ($get) {
+                                $flightId = $get('flight_id'); // Get the selected flight_id
+                                if (!$flightId) {
+                                    return []; // Return empty options if no flight is selected
+                                }
+
+                                // Fetch classes related to the selected flight
+                                $class =  FlightClass::where('flight_id', $flightId)->get();
+                                return $class->pluck('class_type', 'id')
+                                    ->toArray();
+                            })
+                            ->afterStateUpdated(function ($state, $set) {
+                                if ($state) {
+                                    $class = FlightClass::find($state);
+                                    $set('subtotal', $class->price);
+                                } else {
+                                    $set('subtotal', null);
+                                }
+                            }),
                     ]),
                 Section::make('Informasi Penumpang')
                     ->schema([
-                        TextInput::make('name'),
+                        TextInput::make('name')
+                            ->required(),
                         TextInput::make('email'),
                         TextInput::make('phone'),
+                        TextInput::make('number_of_passengers')
+                            ->label('Jumlah Penumpang')
+                            ->numeric()
+                            ->live()
+                            ->afterStateUpdated(function ($state, $set) {
+                                if ($state) {
+                                    $set('transaction_passengers', array_fill(0, $state, [
+                                        'name' => null,
+                                        'seat' => null,
+                                        'date_of_birth' => null,
+                                        'nationality' => null,
+                                    ]));
+                                } else {
+                                    $set('number_of_passengers', 1);
+                                    $set('transaction_passengers', array_fill(0, 1, [
+                                        'name' => null,
+                                        'seat' => null,
+                                        'date_of_birth' => null,
+                                        'nationality' => null,
+                                    ]));
+                                }
+                            })
+                            ->default(1)
+                            ->minValue(1),
                         Section::make('Daftar Penumpang')
                             ->schema([
                                 Repeater::make('transaction_passengers')
                                     ->relationship('passengers')
-                                    ->afterStateUpdated(function ($state, callable $set) {
-                                        $set('number_of_passengers', count($state)); // Mengatur total elemen repeater
-                                    })
+                                    ->deletable(false)
+                                    ->collapsible()
+                                    ->live()
+                                    ->itemLabel(fn($state) => $state['name'] ?? null)
+                                    ->maxItems(fn($get) => $get('number_of_passengers'))
+                                    // ->afterStateUpdated(function ($state, callable $set) {
+                                    //     $set('number_of_passengers', count($state)); // Mengatur total elemen repeater
+                                    // })
                                     ->schema([
                                         Select::make('seat')
                                             ->options(function () {
@@ -60,21 +123,41 @@ class TransactionResource extends Resource
                                             ->searchable() // Menambahkan fitur pencarian
                                             ->placeholder('Select a seat') // Placeholder untuk select
                                             ->required(), // Menandakan field ini wajib diisi
-                                        TextInput::make('name'),
-                                        DatePicker::make('date_of_birth'),
-                                        TextInput::make('nationality'),
+                                        TextInput::make('name')
+                                            ->live()
+                                            ->afterStateUpdated(fn($state, $set) => $set('canAdd', !empty($state)))
+                                            ->required(),
+                                        DatePicker::make('date_of_birth')
+                                            ->required(),
+                                        TextInput::make('nationality')
+                                            ->required(),
                                     ])
+                                    ->addable(false)
                             ]),
-                        TextInput::make('number_of_passengers')
-                            ->default(1)
-                            ->minValue(1)
-                            ->disabled()
+
 
                     ]),
                 Section::make('Promo Code')
                     ->schema([
                         TextInput::make('promo_code_id')
-                    ]),
+                            ->live()
+                            ->debounce(500)
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                if ($state) {
+                                    $promo = PromoCode::query()->where('code', $state)->first();
+                                    if ($promo) {
+                                        $set('promo_code_message', 'Kode ada');
+                                    } else {
+                                        $set('promo_code_message', 'Kode tidak valid');
+                                    }
+                                } else {
+                                    $set('promo_code_message', '');
+                                }
+                            })
+                            ->helperText(function ($get) {
+                                return $get('promo_code_message'); // Ambil pesan dari state
+                            }),
+                    ])->columns(2),
                 Section::make('Informasi Harga')
                     ->schema([
                         TextInput::make('subtotal')

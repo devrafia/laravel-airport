@@ -35,12 +35,18 @@ class FlightClass extends Model
     protected static function booted()
     {
         static::created(function ($flightClass) {
+            if ($flightClass->class_type == 'economy') {
+                $row = 'E';
+            } else {
+                $row = 'B';
+            }
+
             $totalSeats = $flightClass->total_seats;
 
             for ($i = 1; $i <= $totalSeats; $i++) {
                 FlightSeat::create([
                     'flight_id' => $flightClass->flight_id, // Ambil flight_id dari relasi
-                    'row' => 'R',
+                    'row' => $row,
                     'column' => $i,
                     'class_type' => $flightClass->class_type,
                     'is_available' => 1,

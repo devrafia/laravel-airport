@@ -43,4 +43,27 @@ class Transaction extends Model
     {
         return $this->hasMany(TransactionPassenger::class);
     }
+
+    public static function generateCode()
+    {
+        do {
+            $code = 'TRX-' . strtoupper(uniqid());
+        } while (self::where('code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Boot the model and set the code field automatically.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($transaction) {
+            if (empty($transaction->code)) {
+                $transaction->code = self::generateCode();
+            }
+        });
+    }
 }
