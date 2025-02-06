@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthConroller;
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -10,7 +11,7 @@ use Livewire\Volt\Volt;
 Route::middleware(['guest'])->group(function () {
     Volt::route("/login", "auth.login")->name('login')->methods(['GET', 'POST']);
     Volt::route("/register", "auth.registration")->name('register');
-    Route::post('/authenticate', [AuthConroller::class, 'authenticate'])->name('authenticate');
+    Route::post('/authenticate', [AuthController::class, 'authenticate'])->name('authenticate');
     Volt::route("/otp", "auth.otp")->name('otp');
 });
 
@@ -22,7 +23,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route("/flight/pay", "flight.pay")->name('flight.pay');
     Volt::route("/flight/history", "flight.history")->name('flight.history');
 
-    Route::get('/logout', [AuthConroller::class, 'logout'])->name('logout');
+    Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
 Volt::route("/checkout/success/{id}", "checkout.success")->name('checkout.success');

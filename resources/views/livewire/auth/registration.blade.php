@@ -83,5 +83,8 @@ $submit = function () {
                 required placeholder="Confirm your password">
         </div>
         <button type="submit" class="w-full px-4 py-2 mt-4 text-white bg-blue-500 rounded-md">Register</button>
+        <div class="mt-4 text-center">
+            <a href="{{ route('login') }}" class="text-blue-500 hover:underline">Already have an account? Login</a>
+        </div>
     </form>
 </div>

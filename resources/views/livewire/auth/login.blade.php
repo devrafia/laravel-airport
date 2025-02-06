@@ -36,6 +36,6 @@ layout('components.layouts.auth');
     </form>
 
     <div class="mt-4 text-center">
-        {{-- <p>Don't have an account? <a href="{{ route('register') }}" class="text-blue-500">Register here</a></p> --}}
+        <p>Don't have an account? <a href="{{ route('register') }}" class="text-blue-500">Register here</a></p>
     </div>
 </div>
